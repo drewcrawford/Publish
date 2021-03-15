@@ -19,8 +19,9 @@ struct SiteMapGenerator<Site: Website> {
         let pages = context.pages.values.sorted {
             $0.path < $1.path
         }
+        let tags = context.allTags.sorted()
 
-        let siteMap = makeSiteMap(for: sections, pages: pages, site: context.site)
+        let siteMap = makeSiteMap(for: sections, pages: pages, site: context.site, tags: tags)
         let xml = siteMap.render(indentedBy: indentation)
         let file = try context.createOutputFile(at: "sitemap.xml")
         try file.write(xml)
@@ -34,7 +35,7 @@ private extension SiteMapGenerator {
         })
     }
 
-    func makeSiteMap(for sections: [Section<Site>], pages: [Page], site: Site) -> SiteMap {
+    func makeSiteMap(for sections: [Section<Site>], pages: [Page], site: Site, tags: [Tag]) -> SiteMap {
         SiteMap(
             .forEach(sections) { section in
                 guard shouldIncludePath(section.path) else {
@@ -76,7 +77,17 @@ private extension SiteMapGenerator {
                     .priority(0.5),
                     .lastmod(page.lastModified)
                 )
-            }
+            },
+            .forEach(tags, { tag in
+                guard shouldIncludePath(site.path(for: tag)) else {
+                    return.empty
+                }
+                return .url(.loc(site.url(for: tag)),
+                            .changefreq(.monthly),
+                            .priority(0.25),
+                            .lastmod(context.items(taggedWith: tag).map(\.lastModified).max() ?? .distantPast)
+                )
+            })
         )
     }
 }
